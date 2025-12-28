@@ -495,15 +495,18 @@ function displayNotes(notesToShow) {
     }
 
     notesContainer.innerHTML = notesToShow.map(note => {
-        const displayTimestamp = note.createdAt?.toDate()
-            ? note.createdAt.toDate().toLocaleString('es-ES', {
+        // Manejar ambos formatos: Firestore Timestamp y ISO string
+        let displayTimestamp = 'N/A';
+        if (note.createdAt) {
+            const date = note.createdAt.toDate ? note.createdAt.toDate() : new Date(note.createdAt);
+            displayTimestamp = date.toLocaleString('es-ES', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
-            })
-            : 'N/A';
+            });
+        }
 
         const tagsHtml = (note.tags && note.tags.length > 0)
             ? `<div class="note-tags">${note.tags.map(tag =>
