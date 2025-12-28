@@ -155,7 +155,7 @@ function showCryptoPasswordModal() {
         <div class="custom-modal-content" style="max-width: 420px; background: #1a1a2e; border: 1px solid #2d2d44;">
             <h3 style="color: #22c55e;"><i class="fas fa-lock"></i> Acceso Seguro E2E</h3>
             <p style="margin-bottom: 1rem; color: #a0a0b0;">
-                Tus notas estan cifradas de extremo a extremo. Introduce tu contrasena para desbloquearlas.
+                Tus notas están cifradas de extremo a extremo. Introduce tu contraseña para desbloquearlas.
             </p>
             <div style="background: #252540; padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; color: #c0c0d0;">
                 <i class="fas fa-shield-alt" style="color: #22c55e;"></i>
@@ -163,7 +163,7 @@ function showCryptoPasswordModal() {
             </div>
             <div style="position: relative; margin-bottom: 1.25rem;">
                 <input type="password" id="cryptoPassword" 
-                       placeholder="Tu contrasena" 
+                       placeholder="Tu contraseña" 
                        style="width: 100%; padding: 1rem 3rem 1rem 1rem; font-size: 1.1rem; 
                               background: #252540; border: 1px solid #3d3d5c; border-radius: 8px;
                               color: #fff; outline: none;">
