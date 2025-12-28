@@ -4,7 +4,7 @@
 // ============================================
 
 // 🆙 VERSIÓN - Incrementa este número cada vez que hagas cambios
-const CACHE_VERSION = 'v20';
+const CACHE_VERSION = 'v21';
 const CACHE_NAME = `guardia-cache-${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `guardia-dynamic-${CACHE_VERSION}`;
 
@@ -20,7 +20,7 @@ const NETWORK_FIRST_PATTERNS = [
   /fonts\.googleapis\.com/  // Google Fonts
 ];
 
-// 📦 Archivos a precachear (RUTAS EN RAÍZ)
+// 📦 Archivos a precachear (SOLO LOCALES - los CDN se cachean dinámicamente)
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -70,14 +70,9 @@ const urlsToCache = [
   '/herramientas-guardia/calculadora-de-drogas/images/oxido_nitroso.jpg',
   '/herramientas-guardia/calculadora-de-drogas/images/poppers.jpg',
   '/herramientas-guardia/calculadora-de-drogas/images/speed.jpg',
-  '/herramientas-guardia/calculadora-de-drogas/images/tuci.jpg',
-
-  // --- Dependencias externas ---
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
-  'https://cdn.quilljs.com/1.3.6/quill.snow.css',
-  'https://cdn.quilljs.com/1.3.6/quill.js',
-  'https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'
+  '/herramientas-guardia/calculadora-de-drogas/images/tuci.jpg'
+  // ⚠️ Los CDN externos (Quill, Font Awesome, Tailwind, etc.) se cachean DINÁMICAMENTE
+  // No los incluimos aquí porque si fallan, rompen toda la instalación del SW
 ];
 
 // ============================================
