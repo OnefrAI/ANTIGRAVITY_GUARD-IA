@@ -187,6 +187,13 @@ async function handleFormSubmit(e) {
     saveNoteButton.querySelector('span').textContent = isEditing ? 'Actualizando...' : 'Guardando...';
 
     try {
+        // Verificar que quill esté disponible
+        if (!quill) {
+            console.error('Error: Quill editor no está inicializado');
+            showToast("Error: Editor no disponible. Recarga la página.", 'error');
+            return;
+        }
+
         const noteData = {
             interventionLocation: document.getElementById('interventionLocation').value,
             documentNumber: document.getElementById('documentNumber').value,
