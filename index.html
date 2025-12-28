@@ -1501,7 +1501,7 @@
             setInterval(() => {
               registration.update();
               console.log('[App] 🔍 Buscando actualizaciones...');
-            }, 60 * 60 * 1000);
+            }, 5 * 60 * 1000); // Cada 5 minutos
 
             // Detectar cuando hay un nuevo SW instalándose
             registration.onupdatefound = () => {
@@ -1512,9 +1512,13 @@
                 if (newWorker.state === 'installed') {
                   // Si ya hay un SW controlador, significa que es una actualización
                   if (navigator.serviceWorker.controller) {
-                    console.log('[App] ✅ Nueva versión lista para activar');
+                    console.log('[App] ✅ Nueva versión lista - aplicando automáticamente...');
                     pendingWorker = newWorker;
+                    // Auto-aplicar después de 2 segundos (sin esperar al usuario)
                     showUpdateBanner();
+                    setTimeout(() => {
+                      applyUpdate();
+                    }, 2000);
                   } else {
                     // Primera instalación
                     console.log('[App] 🎉 Primera instalación completada');
@@ -1565,16 +1569,32 @@
     // 🔔 CONFIGURACIÓN DE NOVEDADES
     // ==========================================
     // Cambia este número cada vez que añadas una novedad para que aparezca el badge
-    const GUARDIA_NEWS_VERSION = '20231223';
+    const GUARDIA_NEWS_VERSION = '20251228';
 
     // Array de novedades (las más recientes primero)
     // Copia y pega un bloque para añadir una nueva novedad
     const GUARDIA_NEWS = [
       {
+        version: '2.2',
+        date: '28 Diciembre 2025',
+        title: '🔐 Cifrado E2E + Huella Digital',
+        important: true,
+        content: `
+          <p>¡Tus notas ahora son <strong>100% privadas</strong>!</p>
+          <ul>
+            <li>🔒 <strong>Cifrado extremo a extremo</strong> - Ni siquiera el administrador puede leer tus datos</li>
+            <li>👆 <strong>Desbloqueo con huella</strong> - Acceso ultra rápido en dispositivos compatibles</li>
+            <li>🔑 <strong>Fallback seguro</strong> - Usa contraseña si no hay biometría</li>
+            <li>📱 <strong>Compatible con Face ID</strong> y Windows Hello</li>
+          </ul>
+          <p style="color:#22c55e;"><strong>⚠️ Importante:</strong> Si olvidas tu contraseña, tus datos serán irrecuperables.</p>
+        `
+      },
+      {
         version: '2.1',
         date: '23 Diciembre 2025',
         title: '📅 Mejoras en Calendario',
-        important: true,
+        important: false,
         content: `
           <p>¡El <strong>Calendario GUARD-IA</strong> ahora es mejor que nunca!</p>
           <ul>
