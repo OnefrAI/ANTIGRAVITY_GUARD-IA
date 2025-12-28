@@ -4,7 +4,7 @@
 // ============================================
 
 // 🆙 VERSIÓN - Incrementa este número cada vez que hagas cambios
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = `guardia-cache-${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `guardia-dynamic-${CACHE_VERSION}`;
 
@@ -133,6 +133,20 @@ self.addEventListener('fetch', (event) => {
   const firebaseHosts = ['firestore.googleapis.com', 'firebaseapp.com', 'gstatic.com/firebasejs'];
   if (firebaseHosts.some((h) => req.url.includes(h))) {
     return;
+  }
+
+  // 🌐 Excluir CDN externos - siempre van directo a red (sin cachear)
+  // Esto evita que el SW sirva respuestas 503 cacheadas
+  const cdnHosts = [
+    'cdn.quilljs.com',
+    'cdnjs.cloudflare.com',
+    'cdn.tailwindcss.com',
+    'cdn.jsdelivr.net',
+    'fonts.googleapis.com',
+    'fonts.gstatic.com'
+  ];
+  if (cdnHosts.some((h) => url.hostname.includes(h))) {
+    return; // No interceptar, dejar que vaya directo a red
   }
 
   // Solo procesar GET requests
