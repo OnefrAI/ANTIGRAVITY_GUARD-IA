@@ -631,23 +631,23 @@ textarea {
 }
 
 .tag-servicio-de-sala {
-  background: var(--tag-servicio-bg);
-  color: var(--tag-servicio-text);
+  background: #39FF14 !important;
+  color: #0a0a0a !important;
 }
 
 .tag-a-requerimiento {
-  background: var(--tag-requerimiento-bg);
-  color: var(--tag-requerimiento-text);
+  background: #3b82f6 !important;
+  color: #ffffff !important;
 }
 
 .tag-por-superioridad {
-  background: var(--tag-superioridad-bg);
-  color: var(--tag-superioridad-text);
+  background: #f59e0b !important;
+  color: #0a0a0a !important;
 }
 
 .tag-otros {
-  background: var(--tag-otros-bg);
-  color: var(--tag-otros-text);
+  background: #8b5cf6 !important;
+  color: #ffffff !important;
 }
 
 .dropdown-container {
