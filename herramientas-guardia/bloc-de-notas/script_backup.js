@@ -47,7 +47,7 @@ const authStateDiv = document.getElementById('auth-state');
 const appContentDiv = document.getElementById('app-content');
 const userInfoDiv = document.getElementById('user-info');
 
-// Variables que se inicializaran despues
+// Variables que se inicializarán después
 let noteForm, notesContainer, saveNoteButton;
 let formTitle, cancelEditButton;
 let searchInput, tagFilter, tagsDropdownInput, tagsDropdownOptions;
@@ -68,148 +68,41 @@ let currentUserId = null;
 let unsubscribeFromNotes = null;
 let allNotes = [];
 let isEditing = false;
-let currentEditingNoteId = null;
 
 // ===== E2E ENCRYPTION STATE =====
-let userCryptoKey = null;  // Clave AES derivada de la contrasena
-let userSalt = null;       // Salt unico del usuario
+let userCryptoKey = null;  // Clave AES derivada de la contraseña
+let userSalt = null;       // Salt único del usuario
+let pendingPassword = null; // Contraseña temporal para derivar clave
+let currentEditingNoteId = null;
 
 // ===== AUTHENTICATION =====
-onAuthStateChanged(auth, async (user) => {
-    console.log('[E2E] Estado de autenticacion:', user ? 'Usuario conectado' : 'Sin usuario');
+onAuthStateChanged(auth, (user) => {
+    console.log('🔐 Estado de autenticación:', user ? 'Usuario conectado' : 'Sin usuario');
 
     if (user) {
         currentUserId = user.uid;
-        console.log('[E2E] Usuario ID:', currentUserId);
+        console.log('✅ Usuario ID:', currentUserId);
 
-        // Si no tenemos clave crypto, mostrar modal para pedir contrasena
-        if (!userCryptoKey) {
-            showCryptoPasswordModal();
-            return;
-        }
+        authStateDiv.classList.add('hidden');
+        appContentDiv.classList.remove('hidden');
 
-        startApp();
+        setTimeout(() => {
+            console.log('⏳ Inicializando aplicación...');
+            initializeDOMElements();
+            setupUserInterface(user);
+            listenForNotes();
+            console.log('✅ Aplicación inicializada correctamente');
+        }, 200);
+
     } else {
-        console.log('[E2E] Usuario no autenticado');
-        userCryptoKey = null;
-        userSalt = null;
+        console.log('❌ Usuario no autenticado');
         handleLogout();
     }
 });
 
-// ===== INICIAR APP TRAS DESBLOQUEO =====
-function startApp() {
-    authStateDiv.classList.add('hidden');
-    appContentDiv.classList.remove('hidden');
-
-    setTimeout(() => {
-        console.log('[E2E] Inicializando aplicacion...');
-        initializeDOMElements();
-        setupUserInterface(auth.currentUser);
-        listenForNotes();
-        console.log('[E2E] Aplicacion inicializada correctamente');
-    }, 200);
-}
-
-// ===== CRYPTO INITIALIZATION =====
-async function initializeCrypto(password) {
-    try {
-        console.log('[E2E] Inicializando cifrado E2E...');
-
-        // Obtener o crear salt del usuario
-        const cryptoDocRef = doc(db, "users", currentUserId, "settings", "crypto");
-        const cryptoDoc = await getDoc(cryptoDocRef);
-
-        if (cryptoDoc.exists()) {
-            userSalt = cryptoDoc.data().salt;
-            console.log('[E2E] Salt existente recuperado');
-        } else {
-            // Primer uso: crear salt nuevo
-            userSalt = generateSalt();
-            await setDoc(cryptoDocRef, { salt: userSalt, createdAt: serverTimestamp() });
-            console.log('[E2E] Nuevo salt creado y guardado');
-        }
-
-        // Derivar clave AES de la contrasena
-        userCryptoKey = await deriveKey(password, userSalt);
-        sessionStorage.setItem('guardia_crypto_ready', currentUserId);
-
-        console.log('[E2E] Cifrado E2E inicializado correctamente');
-        return true;
-    } catch (error) {
-        console.error('[E2E] Error inicializando cifrado:', error);
-        return false;
-    }
-}
-
-// Modal para pedir contrasena (necesaria para derivar clave)
-function showCryptoPasswordModal() {
-    // Ocultar contenido mientras se pide contrasena
-    authStateDiv.classList.remove('hidden');
-    appContentDiv.classList.add('hidden');
-
-    const overlay = document.createElement('div');
-    overlay.className = 'custom-modal-overlay active';
-    overlay.id = 'cryptoModal';
-    overlay.innerHTML = `
-        <div class="custom-modal-content" style="max-width: 400px;">
-            <h3><i class="fas fa-lock"></i> Acceso Seguro E2E</h3>
-            <p style="margin-bottom: 1rem; color: var(--text-medium-color);">
-                Tus notas estan cifradas de extremo a extremo. Introduce tu contrasena para desbloquearlas.
-            </p>
-            <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem;">
-                <i class="fas fa-shield-alt" style="color: #22c55e;"></i>
-                <strong>Cifrado E2E:</strong> Ni siquiera el administrador puede leer tus datos.
-            </div>
-            <input type="password" id="cryptoPassword" class="form-input"
-                   placeholder="Tu contrasena" style="width: 100%; margin-bottom: 1rem;">
-            <p id="cryptoError" style="color: #ef4444; font-size: 0.85rem; display: none; margin-bottom: 1rem;"></p>
-            <button id="cryptoSubmit" class="btn btn-primary" style="width: 100%;">
-                <i class="fas fa-unlock"></i> Desbloquear Notas
-            </button>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-
-    const passwordInput = document.getElementById('cryptoPassword');
-    const submitBtn = document.getElementById('cryptoSubmit');
-    const errorMsg = document.getElementById('cryptoError');
-
-    passwordInput.focus();
-
-    async function handleSubmit() {
-        const password = passwordInput.value;
-        if (!password) {
-            errorMsg.textContent = 'Introduce tu contrasena';
-            errorMsg.style.display = 'block';
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desbloqueando...';
-
-        const success = await initializeCrypto(password);
-
-        if (success) {
-            overlay.remove();
-            startApp();
-        } else {
-            errorMsg.textContent = 'Error al procesar. Verifica tu contrasena.';
-            errorMsg.style.display = 'block';
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-unlock"></i> Desbloquear Notas';
-        }
-    }
-
-    submitBtn.onclick = handleSubmit;
-    passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSubmit();
-    });
-}
-
 // ===== INICIALIZAR ELEMENTOS DEL DOM =====
 function initializeDOMElements() {
-    console.log('[E2E] Capturando elementos del DOM...');
+    console.log('🔄 Capturando elementos del DOM...');
 
     noteForm = document.getElementById('noteForm');
     notesContainer = document.getElementById('notesContainer');
@@ -223,14 +116,14 @@ function initializeDOMElements() {
     selectedTagsDisplay = document.getElementById('selectedTagsDisplay');
 
     if (!noteForm) {
-        console.error('[E2E] Error: No se encontraron los elementos del formulario');
+        console.error('❌ Error: No se encontraron los elementos del formulario');
         return;
     }
 
     initializeQuillEditor();
     attachEventListeners();
 
-    console.log('[E2E] Elementos DOM capturados correctamente');
+    console.log('✅ Elementos DOM capturados correctamente');
 }
 
 // ===== INICIALIZAR QUILL EDITOR =====
@@ -243,9 +136,9 @@ function initializeQuillEditor() {
                     toolbar: false
                 },
                 theme: 'snow',
-                placeholder: 'Escribe aqui los hechos y detalles de la intervencion...',
+                placeholder: 'Escribe aquí los hechos y detalles de la intervención...',
             });
-            console.log('[E2E] Quill Editor inicializado');
+            console.log('✅ Quill Editor inicializado');
         }
     }
 }
@@ -254,7 +147,7 @@ function initializeQuillEditor() {
 function setupUserInterface(user) {
     userInfoDiv.innerHTML = `
         <div class="user-info-container">
-            <span class="user-email"><i class="fas fa-lock" style="color:#22c55e;margin-right:4px;"></i>${user.email}</span>
+            <span class="user-email">${user.email}</span>
             <button id="logoutButton" class="logout-btn">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Salir</span>
@@ -265,28 +158,23 @@ function setupUserInterface(user) {
     const logoutBtn = document.getElementById('logoutButton');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-            console.log('[E2E] Cerrando sesion...');
-            userCryptoKey = null;
-            userSalt = null;
-            sessionStorage.removeItem('guardia_crypto_ready');
+            console.log('🚪 Cerrando sesión...');
             signOut(auth).catch(error => {
-                console.error("Error al cerrar sesion:", error);
-                showToast("Error al cerrar sesion", 'error');
+                console.error("Error al cerrar sesión:", error);
+                showToast("Error al cerrar sesión", 'error');
             });
         });
     }
 }
 
-// ===== MANEJAR CIERRE DE SESION =====
+// ===== MANEJAR CIERRE DE SESIÓN =====
 function handleLogout() {
     currentUserId = null;
-    userCryptoKey = null;
-    userSalt = null;
     appContentDiv.classList.add('hidden');
     authStateDiv.classList.remove('hidden');
     authStateDiv.innerHTML = `
-        <p><i class="fas fa-exclamation-triangle"></i> Debes iniciar sesion para usar el bloc de notas.</p>
-        <p><a href="../../index.html">Volver para iniciar sesion</a></p>
+        <p><i class="fas fa-exclamation-triangle"></i> Debes iniciar sesión para usar el bloc de notas.</p>
+        <p><a href="../../index.html">Volver para iniciar sesión</a></p>
     `;
     userInfoDiv.innerHTML = '';
     if (unsubscribeFromNotes) unsubscribeFromNotes();
@@ -295,7 +183,7 @@ function handleLogout() {
 
 // ===== ADJUNTAR EVENT LISTENERS =====
 function attachEventListeners() {
-    console.log('[E2E] Adjuntando event listeners...');
+    console.log('🔄 Adjuntando event listeners...');
 
     noteForm.addEventListener('submit', handleFormSubmit);
     cancelEditButton.addEventListener('click', resetForm);
@@ -305,18 +193,17 @@ function attachEventListeners() {
     tagsDropdownOptions.addEventListener('click', handleDropdownSelection);
     document.addEventListener('click', handleOutsideDropdownClick);
 
-    console.log('[E2E] Event listeners adjuntados correctamente');
+    console.log('✅ Event listeners adjuntados correctamente');
 }
 
-// ===== FORM SUBMIT HANDLER (E2E ENCRYPTED) =====
+// ===== FORM SUBMIT HANDLER =====
 async function handleFormSubmit(e) {
     e.preventDefault();
     saveNoteButton.disabled = true;
-    saveNoteButton.querySelector('span').textContent = isEditing ? 'Actualizando...' : 'Cifrando...';
+    saveNoteButton.querySelector('span').textContent = isEditing ? 'Actualizando...' : 'Guardando...';
 
     try {
-        // Datos sensibles a cifrar (RGPD)
-        const sensitiveData = {
+        const noteData = {
             interventionLocation: document.getElementById('interventionLocation').value,
             documentNumber: document.getElementById('documentNumber').value,
             fullName: document.getElementById('fullName').value,
@@ -327,41 +214,23 @@ async function handleFormSubmit(e) {
             phone: document.getElementById('phone').value,
             factsHtml: quill.root.innerHTML,
             factsText: quill.getText(),
-        };
-
-        // Cifrar datos sensibles
-        let encryptedData = null;
-        if (userCryptoKey) {
-            encryptedData = await encrypt(sensitiveData, userCryptoKey);
-            console.log('[E2E] Datos cifrados exitosamente');
-        } else {
-            console.warn('[E2E] No hay clave de cifrado!');
-            showToast('Error: No hay clave de cifrado', 'error');
-            return;
-        }
-
-        // Datos a guardar (metadatos sin cifrar + datos cifrados)
-        const noteData = {
             tags: selectedTags,
-            isEncrypted: true,
-            encryptedData: encryptedData,
-            encryptedVersion: 1  // Para futuras migraciones
         };
 
         if (isEditing) {
             const noteDocRef = doc(db, "users", currentUserId, "notes", currentEditingNoteId);
             await updateDoc(noteDocRef, noteData);
-            showToast("Nota actualizada (cifrada E2E)");
+            showToast("Nota actualizada exitosamente");
         } else {
             noteData.createdAt = serverTimestamp();
             const notesCollection = collection(db, "users", currentUserId, "notes");
             await addDoc(notesCollection, noteData);
-            showToast("Nota guardada con cifrado E2E");
+            showToast("Nota guardada en la nube exitosamente");
         }
 
         resetForm();
     } catch (error) {
-        console.error("[E2E] Error durante el guardado:", error);
+        console.error("Error durante el guardado/actualización:", error);
         showToast("Hubo un error al guardar la nota", 'error');
     } finally {
         saveNoteButton.disabled = false;
@@ -369,7 +238,7 @@ async function handleFormSubmit(e) {
     }
 }
 
-// ===== FIRESTORE LOGIC (WITH DECRYPTION) =====
+// ===== FIRESTORE LOGIC =====
 function listenForNotes() {
     if (!currentUserId || !notesContainer) return;
     if (unsubscribeFromNotes) unsubscribeFromNotes();
@@ -377,97 +246,20 @@ function listenForNotes() {
     const notesCollection = collection(db, "users", currentUserId, "notes");
     const q = query(notesCollection);
 
-    notesContainer.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Cargando y descifrando notas...</p>";
+    notesContainer.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Cargando notas desde la nube...</p>";
 
-    unsubscribeFromNotes = onSnapshot(q, async (querySnapshot) => {
+    unsubscribeFromNotes = onSnapshot(q, (querySnapshot) => {
         allNotes = [];
-        let migrationNeeded = [];
-
-        for (const docSnap of querySnapshot.docs) {
-            const data = docSnap.data();
-            let noteData = { id: docSnap.id, createdAt: data.createdAt, tags: data.tags || [] };
-
-            if (data.isEncrypted && data.encryptedData) {
-                // Descifrar nota
-                try {
-                    const decrypted = await decrypt(data.encryptedData, userCryptoKey);
-                    noteData = { ...noteData, ...decrypted };
-                    noteData._encrypted = true;
-                } catch (err) {
-                    console.error('[E2E] Error descifrando nota:', docSnap.id, err);
-                    noteData.fullName = '[Error al descifrar]';
-                    noteData.factsText = 'No se pudo descifrar esta nota. Puede que la contrasena sea incorrecta.';
-                    noteData._decryptError = true;
-                }
-            } else {
-                // Nota antigua sin cifrar - marcar para migracion
-                noteData = { ...noteData, ...data };
-                noteData._needsMigration = true;
-                migrationNeeded.push({ id: docSnap.id, data: data });
-            }
-
-            allNotes.push(noteData);
-        }
-
+        querySnapshot.forEach((doc) => {
+            allNotes.push({ id: doc.id, ...doc.data() });
+        });
         allNotes.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
         populateTagFilter();
         applyFilters();
-
-        // Migrar notas antiguas automaticamente
-        if (migrationNeeded.length > 0) {
-            console.log('[E2E] Migrando', migrationNeeded.length, 'notas antiguas...');
-            showToast(`Migrando ${migrationNeeded.length} notas a cifrado E2E...`);
-            await migrateOldNotes(migrationNeeded);
-        }
     }, (error) => {
-        console.error(`[E2E] Error al cargar las notas: ${error.message}`);
-        notesContainer.innerHTML = "<p><i class='fas fa-exclamation-circle'></i> Error al cargar las notas. Por favor, recarga la pagina.</p>";
+        console.error(`Error al cargar las notas: ${error.message}`);
+        notesContainer.innerHTML = "<p><i class='fas fa-exclamation-circle'></i> Error al cargar las notas. Por favor, recarga la página.</p>";
     });
-}
-
-// ===== MIGRATE OLD NOTES =====
-async function migrateOldNotes(notes) {
-    for (const item of notes) {
-        try {
-            const sensitiveData = {
-                interventionLocation: item.data.interventionLocation || '',
-                documentNumber: item.data.documentNumber || '',
-                fullName: item.data.fullName || '',
-                birthPlace: item.data.birthPlace || '',
-                birthdate: item.data.birthdate || '',
-                parentsName: item.data.parentsName || '',
-                address: item.data.address || '',
-                phone: item.data.phone || '',
-                factsHtml: item.data.factsHtml || '',
-                factsText: item.data.factsText || '',
-            };
-
-            const encryptedData = await encrypt(sensitiveData, userCryptoKey);
-
-            const noteDocRef = doc(db, "users", currentUserId, "notes", item.id);
-            await updateDoc(noteDocRef, {
-                isEncrypted: true,
-                encryptedData: encryptedData,
-                encryptedVersion: 1,
-                // Eliminar campos de texto plano
-                interventionLocation: null,
-                documentNumber: null,
-                fullName: null,
-                birthPlace: null,
-                birthdate: null,
-                parentsName: null,
-                address: null,
-                phone: null,
-                factsHtml: null,
-                factsText: null,
-            });
-
-            console.log('[E2E] Nota migrada:', item.id);
-        } catch (err) {
-            console.error('[E2E] Error migrando nota:', item.id, err);
-        }
-    }
-    showToast('Migracion E2E completada');
 }
 
 // ===== SHARE NOTE =====
@@ -491,26 +283,26 @@ function formatNoteForSharing(note) {
         : 'N/A';
 
     const tags = note.tags && note.tags.length > 0
-        ? `\nEtiquetas: ${note.tags.join(', ')}`
+        ? `\n🏷️ Etiquetas: ${note.tags.join(', ')}`
         : '';
 
-    return `NOTA DE INTERVENCION
-========================
+    return `📋 NOTA DE INTERVENCIÓN
+━━━━━━━━━━━━━━━━━━━━━━
 
-Fecha y Hora: ${timestamp}
-Lugar: ${note.interventionLocation || 'N/A'}
-Documento: ${note.documentNumber || 'N/A'}
-Nombre: ${note.fullName || 'N/A'}
-Lugar de Nacimiento: ${note.birthPlace || 'N/A'}
-Fecha de Nacimiento: ${note.birthdate || 'N/A'}
-Telefono: ${note.phone || 'N/A'}
-Padres: ${note.parentsName || 'N/A'}
-Direccion: ${note.address || 'N/A'}
+⏰ Fecha y Hora: ${timestamp}
+📍 Lugar: ${note.interventionLocation || 'N/A'}
+🆔 Documento: ${note.documentNumber || 'N/A'}
+👤 Nombre: ${note.fullName || 'N/A'}
+🌍 Lugar de Nacimiento: ${note.birthPlace || 'N/A'}
+📅 Fecha de Nacimiento: ${note.birthdate || 'N/A'}
+📞 Teléfono: ${note.phone || 'N/A'}
+👨‍👩‍👧 Padres: ${note.parentsName || 'N/A'}
+🏠 Dirección: ${note.address || 'N/A'}
 
-HECHOS:
+📝 HECHOS:
 ${note.factsText || 'N/A'}${tags}
 
-========================
+━━━━━━━━━━━━━━━━━━━━━━
 Generado por GUARD-IA`.trim();
 }
 
@@ -523,7 +315,7 @@ function showShareModal(noteText) {
     overlay.innerHTML = `
         <div class="share-modal-content">
             <h3><i class="fas fa-share-alt"></i> Compartir Nota</h3>
-            <p>Elige como quieres compartir esta nota:</p>
+            <p>Elige cómo quieres compartir esta nota:</p>
             <div class="share-buttons">
                 <button class="share-btn copy-btn">
                     <i class="fas fa-copy"></i>
@@ -590,7 +382,7 @@ window.deleteNote = async function (noteId) {
     if (!currentUserId || !noteId) return;
 
     const confirmed = await createConfirmationModal(
-        "Estas seguro de eliminar esta nota? Esta accion no se puede deshacer."
+        "¿Estás seguro de eliminar esta nota? Esta acción no se puede deshacer."
     );
 
     if (!confirmed) return;
@@ -694,7 +486,7 @@ function displayNotes(notesToShow) {
         notesContainer.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--text-medium-color);">
                 <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                <p style="font-size: 1.125rem;">No hay notas que coincidan con tu busqueda</p>
+                <p style="font-size: 1.125rem;">No hay notas que coincidan con tu búsqueda</p>
             </div>
         `;
         return;
@@ -717,24 +509,17 @@ function displayNotes(notesToShow) {
             ).join('')}</div>`
             : '';
 
-        // Indicador de estado de cifrado
-        const encryptedBadge = note._encrypted
-            ? '<span style="background:#22c55e;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.7rem;margin-left:8px;"><i class="fas fa-lock"></i> E2E</span>'
-            : (note._decryptError
-                ? '<span style="background:#ef4444;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.7rem;margin-left:8px;"><i class="fas fa-exclamation-triangle"></i> Error</span>'
-                : '');
-
         return `
         <div class="note">
-            <p><strong><i class="fas fa-clock"></i> Fecha y Hora:</strong> ${displayTimestamp}${encryptedBadge}</p>
-            <p><strong><i class="fas fa-map-marker-alt"></i> Lugar de Intervencion:</strong> ${note.interventionLocation || 'N/A'}</p>
+            <p><strong><i class="fas fa-clock"></i> Fecha y Hora:</strong> ${displayTimestamp}</p>
+            <p><strong><i class="fas fa-map-marker-alt"></i> Lugar de Intervención:</strong> ${note.interventionLocation || 'N/A'}</p>
             <p><strong><i class="fas fa-id-card"></i> Documento:</strong> ${note.documentNumber || 'N/A'}</p>
             <p><strong><i class="fas fa-user"></i> Nombre:</strong> ${note.fullName || 'N/A'}</p>
             <p><strong><i class="fas fa-globe"></i> Lugar de Nacimiento:</strong> ${note.birthPlace || 'N/A'}</p>
             <p><strong><i class="fas fa-calendar"></i> Fecha de Nacimiento:</strong> ${note.birthdate || 'N/A'}</p>
-            <p><strong><i class="fas fa-phone"></i> Telefono:</strong> ${note.phone || 'N/A'}</p>
+            <p><strong><i class="fas fa-phone"></i> Teléfono:</strong> ${note.phone || 'N/A'}</p>
             <p><strong><i class="fas fa-users"></i> Padres:</strong> ${note.parentsName || 'N/A'}</p>
-            <p><strong><i class="fas fa-home"></i> Direccion:</strong> ${note.address || 'N/A'}</p>
+            <p><strong><i class="fas fa-home"></i> Dirección:</strong> ${note.address || 'N/A'}</p>
             <p><strong><i class="fas fa-pen"></i> Hechos:</strong></p>
             <div class="ql-editor-readonly">${note.factsHtml || 'N/A'}</div>
             ${tagsHtml}
@@ -747,7 +532,7 @@ function displayNotes(notesToShow) {
                 </button>
                 <button class="btn btn-delete" onclick="window.deleteNote('${note.id}')">
                     <i class="fas fa-trash"></i> Eliminar
-                </button>
+                </button>               
             </div>
         </div>`;
     }).join('');
@@ -786,7 +571,7 @@ function renderSelectedTags() {
         const tagItem = document.createElement('span');
         tagItem.className = `selected-tag-item ${tagColorMap[tag] || ''}`;
         tagItem.innerHTML = `
-            ${tag}
+            ${tag} 
             <i class="fas fa-times-circle remove-tag-icon" data-tag="${tag}"></i>
         `;
         tagItem.querySelector('.remove-tag-icon').addEventListener('click', (e) => {
@@ -843,7 +628,7 @@ function createConfirmationModal(message) {
     overlay.className = 'custom-modal-overlay active';
     overlay.innerHTML = `
         <div class="custom-modal-content">
-            <h3><i class="fas fa-exclamation-triangle"></i> Confirmacion</h3>
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirmación</h3>
             <p>${message}</p>
             <div class="custom-modal-buttons">
                 <button class="custom-modal-btn confirm">
