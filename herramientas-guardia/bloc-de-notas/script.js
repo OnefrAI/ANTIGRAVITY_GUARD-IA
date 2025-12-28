@@ -152,19 +152,30 @@ function showCryptoPasswordModal() {
     overlay.className = 'custom-modal-overlay active';
     overlay.id = 'cryptoModal';
     overlay.innerHTML = `
-        <div class="custom-modal-content" style="max-width: 400px;">
-            <h3><i class="fas fa-lock"></i> Acceso Seguro E2E</h3>
-            <p style="margin-bottom: 1rem; color: var(--text-medium-color);">
+        <div class="custom-modal-content" style="max-width: 420px; background: #1a1a2e; border: 1px solid #2d2d44;">
+            <h3 style="color: #22c55e;"><i class="fas fa-lock"></i> Acceso Seguro E2E</h3>
+            <p style="margin-bottom: 1rem; color: #a0a0b0;">
                 Tus notas estan cifradas de extremo a extremo. Introduce tu contrasena para desbloquearlas.
             </p>
-            <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem;">
+            <div style="background: #252540; padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; color: #c0c0d0;">
                 <i class="fas fa-shield-alt" style="color: #22c55e;"></i>
-                <strong>Cifrado E2E:</strong> Ni siquiera el administrador puede leer tus datos.
+                <strong style="color: #fff;">Cifrado E2E:</strong> Ni siquiera el administrador puede leer tus datos.
             </div>
-            <input type="password" id="cryptoPassword" class="form-input"
-                   placeholder="Tu contrasena" style="width: 100%; margin-bottom: 1rem;">
+            <div style="position: relative; margin-bottom: 1.25rem;">
+                <input type="password" id="cryptoPassword" 
+                       placeholder="Tu contrasena" 
+                       style="width: 100%; padding: 1rem 3rem 1rem 1rem; font-size: 1.1rem; 
+                              background: #252540; border: 1px solid #3d3d5c; border-radius: 8px;
+                              color: #fff; outline: none;">
+                <button type="button" id="togglePassword" 
+                        style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+                               background: none; border: none; color: #808090; cursor: pointer; 
+                               padding: 0.5rem; font-size: 1.1rem;">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
             <p id="cryptoError" style="color: #ef4444; font-size: 0.85rem; display: none; margin-bottom: 1rem;"></p>
-            <button id="cryptoSubmit" class="btn btn-primary" style="width: 100%;">
+            <button id="cryptoSubmit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1rem;">
                 <i class="fas fa-unlock"></i> Desbloquear Notas
             </button>
         </div>
@@ -174,8 +185,16 @@ function showCryptoPasswordModal() {
     const passwordInput = document.getElementById('cryptoPassword');
     const submitBtn = document.getElementById('cryptoSubmit');
     const errorMsg = document.getElementById('cryptoError');
+    const toggleBtn = document.getElementById('togglePassword');
 
     passwordInput.focus();
+
+    // Toggle password visibility
+    toggleBtn.onclick = () => {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        toggleBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+    };
 
     async function handleSubmit() {
         const password = passwordInput.value;
