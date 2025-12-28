@@ -299,6 +299,8 @@ function formatNoteForSharing(note) {
 📞 Teléfono: ${note.phone || 'N/A'}
 👨‍👩‍👧 Padres: ${note.parentsName || 'N/A'}
 🏠 Dirección: ${note.address || 'N/A'}
+🚗 Vehículo: ${note.vehicleBrand || 'N/A'}
+🔢 Matrícula: ${note.licensePlate || 'N/A'}
 
 📝 HECHOS:
 ${note.factsText || 'N/A'}${tags}
@@ -529,6 +531,8 @@ function displayNotes(notesToShow) {
             <p><strong><i class="fas fa-phone"></i> Teléfono:</strong> ${note.phone || 'N/A'}</p>
             <p><strong><i class="fas fa-users"></i> Padres:</strong> ${note.parentsName || 'N/A'}</p>
             <p><strong><i class="fas fa-home"></i> Dirección:</strong> ${note.address || 'N/A'}</p>
+            <p><strong><i class="fas fa-car"></i> Vehículo:</strong> ${note.vehicleBrand || 'N/A'}</p>
+            <p><strong><i class="fas fa-id-badge"></i> Matrícula:</strong> ${note.licensePlate || 'N/A'}</p>
             <p><strong><i class="fas fa-pen"></i> Hechos:</strong></p>
             <div class="ql-editor-readonly">${note.factsHtml || 'N/A'}</div>
             ${tagsHtml}

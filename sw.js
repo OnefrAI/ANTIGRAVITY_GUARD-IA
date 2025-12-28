@@ -4,7 +4,7 @@
 // ============================================
 
 // 🆙 VERSIÓN - Incrementa este número cada vez que hagas cambios
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `guardia-cache-${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `guardia-dynamic-${CACHE_VERSION}`;
 
