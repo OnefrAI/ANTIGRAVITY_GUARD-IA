@@ -1,24 +1,17 @@
 // Import necessary functions from the Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-    getFirestore, 
-    collection, 
-    addDoc, 
-    query, 
-    onSnapshot,
-    deleteDoc,
+import {
+    getFirestore,
     doc,
-    getDoc,
-    updateDoc, 
-    serverTimestamp
+    getDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { 
-    getStorage, 
-    ref, 
-    uploadString, 
+import {
+    getStorage,
+    ref,
+    uploadString,
     getDownloadURL,
-    deleteObject 
+    deleteObject
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // Firebase configuration
@@ -69,14 +62,14 @@ let currentEditingNoteId = null;
 // ===== AUTHENTICATION =====
 onAuthStateChanged(auth, (user) => {
     console.log('🔐 Estado de autenticación:', user ? 'Usuario conectado' : 'Sin usuario');
-    
+
     if (user) {
         currentUserId = user.uid;
         console.log('✅ Usuario ID:', currentUserId);
-        
+
         authStateDiv.classList.add('hidden');
         appContentDiv.classList.remove('hidden');
-        
+
         setTimeout(() => {
             console.log('⏳ Inicializando aplicación...');
             initializeDOMElements();
@@ -84,7 +77,7 @@ onAuthStateChanged(auth, (user) => {
             listenForNotes();
             console.log('✅ Aplicación inicializada correctamente');
         }, 200);
-        
+
     } else {
         console.log('❌ Usuario no autenticado');
         handleLogout();
@@ -94,7 +87,7 @@ onAuthStateChanged(auth, (user) => {
 // ===== INICIALIZAR ELEMENTOS DEL DOM =====
 function initializeDOMElements() {
     console.log('🔄 Capturando elementos del DOM...');
-    
+
     noteForm = document.getElementById('noteForm');
     notesContainer = document.getElementById('notesContainer');
     saveNoteButton = document.getElementById('saveNoteButton');
@@ -105,15 +98,15 @@ function initializeDOMElements() {
     tagsDropdownInput = document.getElementById('tagsDropdownInput');
     tagsDropdownOptions = document.getElementById('tagsDropdownOptions');
     selectedTagsDisplay = document.getElementById('selectedTagsDisplay');
-    
+
     if (!noteForm) {
         console.error('❌ Error: No se encontraron los elementos del formulario');
         return;
     }
-    
+
     initializeQuillEditor();
     attachEventListeners();
-    
+
     console.log('✅ Elementos DOM capturados correctamente');
 }
 
@@ -123,7 +116,7 @@ function initializeQuillEditor() {
         const editorContainer = document.getElementById('editor-container');
         if (editorContainer) {
             quill = new Quill('#editor-container', {
-                modules: { 
+                modules: {
                     toolbar: false
                 },
                 theme: 'snow',
@@ -145,7 +138,7 @@ function setupUserInterface(user) {
             </button>
         </div>
     `;
-    
+
     const logoutBtn = document.getElementById('logoutButton');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
@@ -175,7 +168,7 @@ function handleLogout() {
 // ===== ADJUNTAR EVENT LISTENERS =====
 function attachEventListeners() {
     console.log('🔄 Adjuntando event listeners...');
-    
+
     noteForm.addEventListener('submit', handleFormSubmit);
     cancelEditButton.addEventListener('click', resetForm);
     searchInput.addEventListener('input', applyFilters);
@@ -183,7 +176,7 @@ function attachEventListeners() {
     tagsDropdownInput.addEventListener('click', handleDropdownToggle);
     tagsDropdownOptions.addEventListener('click', handleDropdownSelection);
     document.addEventListener('click', handleOutsideDropdownClick);
-    
+
     console.log('✅ Event listeners adjuntados correctamente');
 }
 
@@ -208,17 +201,30 @@ async function handleFormSubmit(e) {
             tags: selectedTags,
         };
 
+        // Cargar notas existentes de localStorage
+        const storageKey = `guardia_notes_${currentUserId}`;
+        let notes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
         if (isEditing) {
-            const noteDocRef = doc(db, "users", currentUserId, "notes", currentEditingNoteId);
-            await updateDoc(noteDocRef, noteData);
+            // Actualizar nota existente
+            const index = notes.findIndex(n => n.id === currentEditingNoteId);
+            if (index !== -1) {
+                notes[index] = { ...notes[index], ...noteData };
+            }
             showToast("Nota actualizada exitosamente");
         } else {
-            noteData.createdAt = serverTimestamp();
-            const notesCollection = collection(db, "users", currentUserId, "notes");
-            await addDoc(notesCollection, noteData);
-            showToast("Nota guardada en la nube exitosamente");
+            // Crear nota nueva
+            noteData.id = 'note_' + Date.now();
+            noteData.createdAt = new Date().toISOString();
+            notes.unshift(noteData);
+            showToast("Nota guardada localmente");
         }
-        
+
+        // Guardar en localStorage
+        localStorage.setItem(storageKey, JSON.stringify(notes));
+
+        // Recargar notas
+        loadNotesFromLocalStorage();
         resetForm();
     } catch (error) {
         console.error("Error durante el guardado/actualización:", error);
@@ -229,54 +235,49 @@ async function handleFormSubmit(e) {
     }
 }
 
-// ===== FIRESTORE LOGIC =====
+// ===== LOCALSTORAGE LOGIC =====
 function listenForNotes() {
     if (!currentUserId || !notesContainer) return;
-    if (unsubscribeFromNotes) unsubscribeFromNotes();
-    
-    const notesCollection = collection(db, "users", currentUserId, "notes");
-    const q = query(notesCollection);
-    
-    notesContainer.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Cargando notas desde la nube...</p>";
-    
-    unsubscribeFromNotes = onSnapshot(q, (querySnapshot) => {
-        allNotes = [];
-        querySnapshot.forEach((doc) => {
-            allNotes.push({ id: doc.id, ...doc.data() });
-        });
-        allNotes.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
-        populateTagFilter(); 
-        applyFilters(); 
-    }, (error) => {
-        console.error(`Error al cargar las notas: ${error.message}`);
-        notesContainer.innerHTML = "<p><i class='fas fa-exclamation-circle'></i> Error al cargar las notas. Por favor, recarga la página.</p>";
-    });
+    loadNotesFromLocalStorage();
+}
+
+function loadNotesFromLocalStorage() {
+    if (!notesContainer) return;
+
+    const storageKey = `guardia_notes_${currentUserId}`;
+    const notes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    allNotes = notes;
+    // Ordenar por fecha (más recientes primero)
+    allNotes.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    populateTagFilter();
+    applyFilters();
 }
 
 // ===== SHARE NOTE =====
-window.shareNote = async function(noteId) {
+window.shareNote = async function (noteId) {
     const note = allNotes.find(n => n.id === noteId);
     if (!note) return;
-    
+
     const noteText = formatNoteForSharing(note);
     showShareModal(noteText);
 };
 
 function formatNoteForSharing(note) {
-    const timestamp = note.createdAt?.toDate() 
-        ? note.createdAt.toDate().toLocaleString('es-ES', {
+    const timestamp = note.createdAt
+        ? new Date(note.createdAt).toLocaleString('es-ES', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-          })
+        })
         : 'N/A';
-    
-    const tags = note.tags && note.tags.length > 0 
+
+    const tags = note.tags && note.tags.length > 0
         ? `\n🏷️ Etiquetas: ${note.tags.join(', ')}`
         : '';
-    
+
     return `📋 NOTA DE INTERVENCIÓN
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -328,12 +329,12 @@ function showShareModal(noteText) {
         copyToClipboard(noteText);
         overlay.remove();
     };
-    
+
     overlay.querySelector('.whatsapp-btn').onclick = () => {
         shareViaWhatsApp(noteText);
         overlay.remove();
     };
-    
+
     overlay.querySelector('.cancel-share-btn').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.remove();
@@ -369,18 +370,21 @@ function shareViaWhatsApp(text) {
 }
 
 // ===== DELETE NOTE =====
-window.deleteNote = async function(noteId) {
+window.deleteNote = async function (noteId) {
     if (!currentUserId || !noteId) return;
-    
+
     const confirmed = await createConfirmationModal(
         "¿Estás seguro de eliminar esta nota? Esta acción no se puede deshacer."
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
-        const noteDocRef = doc(db, "users", currentUserId, "notes", noteId);
-        await deleteDoc(noteDocRef);
+        const storageKey = `guardia_notes_${currentUserId}`;
+        let notes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        notes = notes.filter(n => n.id !== noteId);
+        localStorage.setItem(storageKey, JSON.stringify(notes));
+        loadNotesFromLocalStorage();
         showToast("Nota eliminada correctamente");
     } catch (error) {
         console.error("Error al eliminar nota:", error);
@@ -430,34 +434,34 @@ function resetForm() {
 // ===== SEARCH & FILTER =====
 function applyFilters() {
     if (!searchInput || !tagFilter) return;
-    
+
     const searchTerm = searchInput.value.toLowerCase().trim();
     const tagToFilter = tagFilter.value;
     let filteredNotes = allNotes;
-    
+
     if (searchTerm) {
         filteredNotes = filteredNotes.filter(note =>
-            Object.values(note).some(value => 
+            Object.values(note).some(value =>
                 String(value).toLowerCase().includes(searchTerm)
             )
         );
     }
-    
+
     if (tagToFilter) {
-        filteredNotes = filteredNotes.filter(note => 
+        filteredNotes = filteredNotes.filter(note =>
             note.tags && note.tags.includes(tagToFilter)
         );
     }
-    
+
     displayNotes(filteredNotes);
 }
 
 function populateTagFilter() {
     if (!tagFilter) return;
-    
+
     const allTags = new Set(allNotes.flatMap(note => note.tags || []));
     const currentFilterValue = tagFilter.value;
-    
+
     tagFilter.innerHTML = '<option value="">Todas las etiquetas</option>';
     allTags.forEach(tag => {
         const option = document.createElement('option');
@@ -465,14 +469,14 @@ function populateTagFilter() {
         option.textContent = tag;
         tagFilter.appendChild(option);
     });
-    
+
     tagFilter.value = currentFilterValue;
 }
 
 // ===== DISPLAY NOTES =====
 function displayNotes(notesToShow) {
     if (!notesContainer) return;
-    
+
     if (!notesToShow || notesToShow.length === 0) {
         notesContainer.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--text-medium-color);">
@@ -482,24 +486,24 @@ function displayNotes(notesToShow) {
         `;
         return;
     }
-    
+
     notesContainer.innerHTML = notesToShow.map(note => {
-        const displayTimestamp = note.createdAt?.toDate() 
+        const displayTimestamp = note.createdAt?.toDate()
             ? note.createdAt.toDate().toLocaleString('es-ES', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
-              })
+            })
             : 'N/A';
-        
-        const tagsHtml = (note.tags && note.tags.length > 0) 
-            ? `<div class="note-tags">${note.tags.map(tag => 
+
+        const tagsHtml = (note.tags && note.tags.length > 0)
+            ? `<div class="note-tags">${note.tags.map(tag =>
                 `<span class="note-tag ${tagColorMap[tag] || ''}">${tag}</span>`
-              ).join('')}</div>`
+            ).join('')}</div>`
             : '';
-        
+
         return `
         <div class="note">
             <p><strong><i class="fas fa-clock"></i> Fecha y Hora:</strong> ${displayTimestamp}</p>
@@ -548,7 +552,7 @@ function handleDropdownSelection(e) {
 
 function handleOutsideDropdownClick(e) {
     if (tagsDropdownInput && tagsDropdownOptions &&
-        !tagsDropdownInput.contains(e.target) && 
+        !tagsDropdownInput.contains(e.target) &&
         !tagsDropdownOptions.contains(e.target)) {
         tagsDropdownOptions.classList.remove('active');
     }
@@ -556,7 +560,7 @@ function handleOutsideDropdownClick(e) {
 
 function renderSelectedTags() {
     if (!selectedTagsDisplay) return;
-    
+
     selectedTagsDisplay.innerHTML = '';
     selectedTags.forEach(tag => {
         const tagItem = document.createElement('span');
@@ -566,7 +570,7 @@ function renderSelectedTags() {
             <i class="fas fa-times-circle remove-tag-icon" data-tag="${tag}"></i>
         `;
         tagItem.querySelector('.remove-tag-icon').addEventListener('click', (e) => {
-            e.stopPropagation(); 
+            e.stopPropagation();
             removeTag(e.target.dataset.tag);
         });
         selectedTagsDisplay.appendChild(tagItem);
@@ -584,14 +588,14 @@ function showToast(message, type = 'success') {
     if (existingToast) {
         existingToast.remove();
     }
-    
+
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
-    
-    const icon = type === 'success' 
-        ? '<i class="fas fa-check-circle"></i>' 
+
+    const icon = type === 'success'
+        ? '<i class="fas fa-check-circle"></i>'
         : '<i class="fas fa-exclamation-circle"></i>';
-    
+
     toast.innerHTML = `${icon} <span>${message}</span>`;
     document.body.appendChild(toast);
 
@@ -635,22 +639,22 @@ function createConfirmationModal(message) {
 
     return new Promise(resolve => {
         overlay.querySelector('.custom-modal-btn.confirm').onclick = () => {
-            if(document.body.contains(overlay)) {
+            if (document.body.contains(overlay)) {
                 document.body.removeChild(overlay);
             }
             resolve(true);
         };
-        
+
         overlay.querySelector('.custom-modal-btn.cancel').onclick = () => {
-            if(document.body.contains(overlay)) {
+            if (document.body.contains(overlay)) {
                 document.body.removeChild(overlay);
             }
             resolve(false);
         };
-        
+
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                if(document.body.contains(overlay)) {
+                if (document.body.contains(overlay)) {
                     document.body.removeChild(overlay);
                 }
                 resolve(false);
