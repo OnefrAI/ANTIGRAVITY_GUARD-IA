@@ -112,6 +112,21 @@ function initializeDOMElements() {
 
 // ===== INICIALIZAR QUILL EDITOR =====
 function initializeQuillEditor() {
+    // Verificar si Quill ya está cargado
+    if (typeof Quill === 'undefined') {
+        console.log('⏳ Esperando a que Quill cargue...');
+        // Reintentar en 500ms, máximo 10 intentos
+        if (!window._quillRetryCount) window._quillRetryCount = 0;
+        if (window._quillRetryCount < 10) {
+            window._quillRetryCount++;
+            setTimeout(initializeQuillEditor, 500);
+        } else {
+            console.error('❌ Error: Quill no se pudo cargar después de 10 intentos');
+            showToast("Error cargando el editor. Recarga la página.", 'error');
+        }
+        return;
+    }
+
     if (!quill) {
         const editorContainer = document.getElementById('editor-container');
         if (editorContainer) {
