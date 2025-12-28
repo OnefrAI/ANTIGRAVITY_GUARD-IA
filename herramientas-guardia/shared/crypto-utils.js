@@ -47,7 +47,7 @@ export async function deriveKey(password, saltBase64) {
         },
         keyMaterial,
         { name: 'AES-GCM', length: 256 },
-        false,
+        true,  // extractable = true para poder exportar/guardar
         ['encrypt', 'decrypt']
     );
 }
