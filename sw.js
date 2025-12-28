@@ -4,7 +4,7 @@
 // ============================================
 
 // 🆙 VERSIÓN - Incrementa este número cada vez que hagas cambios
-const CACHE_VERSION = 'v17';
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = `guardia-cache-${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `guardia-dynamic-${CACHE_VERSION}`;
 
@@ -14,7 +14,10 @@ const NETWORK_FIRST_PATTERNS = [
   /\.css$/,
   /\.js$/,
   /manifest\.json$/,
-  /\/$/  // Rutas raíz como "/" o "/herramientas-guardia/"
+  /\/$/,  // Rutas raíz como "/" o "/herramientas-guardia/"
+  /cdn\.quilljs\.com/,  // Quill editor CDN
+  /cdnjs\.cloudflare\.com/,  // Font Awesome CDN
+  /fonts\.googleapis\.com/  // Google Fonts
 ];
 
 // 📦 Archivos a precachear (RUTAS EN RAÍZ)
