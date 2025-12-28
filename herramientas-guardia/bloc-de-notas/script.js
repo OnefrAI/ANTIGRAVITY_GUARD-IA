@@ -202,6 +202,8 @@ async function handleFormSubmit(e) {
             birthdate: document.getElementById('birthdate').value,
             parentsName: document.getElementById('parentsName').value,
             address: document.getElementById('address').value,
+            vehicleBrand: document.getElementById('vehicleBrand').value,
+            licensePlate: document.getElementById('licensePlate').value,
             phone: document.getElementById('phone').value,
             factsHtml: quill.root.innerHTML,
             factsText: quill.getText(),
@@ -414,6 +416,8 @@ window.startEditNote = (noteId) => {
     document.getElementById('birthdate').value = noteToEdit.birthdate || '';
     document.getElementById('parentsName').value = noteToEdit.parentsName || '';
     document.getElementById('address').value = noteToEdit.address || '';
+    document.getElementById('vehicleBrand').value = noteToEdit.vehicleBrand || '';
+    document.getElementById('licensePlate').value = noteToEdit.licensePlate || '';
     document.getElementById('phone').value = noteToEdit.phone || '';
     quill.root.innerHTML = noteToEdit.factsHtml || '';
     selectedTags = noteToEdit.tags || [];
