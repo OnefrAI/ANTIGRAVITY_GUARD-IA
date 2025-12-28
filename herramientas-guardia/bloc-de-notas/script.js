@@ -25,6 +25,9 @@ import {
 // ===== CRYPTO E2E =====
 import { generateSalt, deriveKey, encrypt, decrypt, isEncrypted } from '../shared/crypto-utils.js';
 
+// ===== WEBAUTHN (Biometría) =====
+import { isWebAuthnAvailable, hasStoredCredential, registerBiometric, authenticateWithBiometric } from '../shared/webauthn-utils.js';
+
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyAf3I3_aW__lBtTVlEJ9xesIWkEJ6lMJp8",
@@ -142,11 +145,13 @@ async function initializeCrypto(password) {
     }
 }
 
-// Modal para pedir contrasena (necesaria para derivar clave)
+// Modal para pedir contraseña o biometría
 function showCryptoPasswordModal() {
-    // Ocultar contenido mientras se pide contrasena
+    // Ocultar contenido mientras se pide autenticación
     authStateDiv.classList.remove('hidden');
     appContentDiv.classList.add('hidden');
+
+    const hasBiometric = isWebAuthnAvailable() && hasStoredCredential(currentUserId);
 
     const overlay = document.createElement('div');
     overlay.className = 'custom-modal-overlay active';
@@ -155,29 +160,43 @@ function showCryptoPasswordModal() {
         <div class="custom-modal-content" style="max-width: 420px; background: #1a1a2e; border: 1px solid #2d2d44;">
             <h3 style="color: #22c55e;"><i class="fas fa-lock"></i> Acceso Seguro E2E</h3>
             <p style="margin-bottom: 1rem; color: #a0a0b0;">
-                Tus notas están cifradas de extremo a extremo. Introduce tu contraseña para desbloquearlas.
+                Tus notas están cifradas de extremo a extremo.
             </p>
             <div style="background: #252540; padding: 0.75rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; color: #c0c0d0;">
                 <i class="fas fa-shield-alt" style="color: #22c55e;"></i>
                 <strong style="color: #fff;">Cifrado E2E:</strong> Ni siquiera el administrador puede leer tus datos.
             </div>
-            <div style="position: relative; margin-bottom: 1.25rem;">
-                <input type="password" id="cryptoPassword" 
-                       placeholder="Tu contraseña" 
-                       style="width: 100%; padding: 1rem 3rem 1rem 1rem; font-size: 1.1rem; 
-                              background: #252540; border: 1px solid #3d3d5c; border-radius: 8px;
-                              color: #fff; outline: none;">
-                <button type="button" id="togglePassword" 
-                        style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
-                               background: none; border: none; color: #808090; cursor: pointer; 
-                               padding: 0.5rem; font-size: 1.1rem;">
-                    <i class="fas fa-eye"></i>
+            
+            ${hasBiometric ? `
+            <!-- OPCIÓN BIOMÉTRICA -->
+            <button id="biometricBtn" class="btn btn-primary" style="width: 100%; padding: 1.25rem; font-size: 1.1rem; margin-bottom: 1rem; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
+                <i class="fas fa-fingerprint" style="font-size: 1.5rem; margin-right: 0.5rem;"></i> Desbloquear con Huella
+            </button>
+            <div style="text-align: center; color: #606070; margin-bottom: 1rem; font-size: 0.85rem;">
+                <span>─── o usa contraseña ───</span>
+            </div>
+            ` : ''}
+            
+            <!-- OPCIÓN CONTRASEÑA -->
+            <div id="passwordSection">
+                <div style="position: relative; margin-bottom: 1rem;">
+                    <input type="password" id="cryptoPassword" 
+                           placeholder="Tu contraseña" 
+                           style="width: 100%; padding: 1rem 3rem 1rem 1rem; font-size: 1.1rem; 
+                                  background: #252540; border: 1px solid #3d3d5c; border-radius: 8px;
+                                  color: #fff; outline: none;">
+                    <button type="button" id="togglePassword" 
+                            style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+                                   background: none; border: none; color: #808090; cursor: pointer; 
+                                   padding: 0.5rem; font-size: 1.1rem;">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <p id="cryptoError" style="color: #ef4444; font-size: 0.85rem; display: none; margin-bottom: 1rem;"></p>
+                <button id="cryptoSubmit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1rem;">
+                    <i class="fas fa-unlock"></i> Desbloquear con Contraseña
                 </button>
             </div>
-            <p id="cryptoError" style="color: #ef4444; font-size: 0.85rem; display: none; margin-bottom: 1rem;"></p>
-            <button id="cryptoSubmit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1rem;">
-                <i class="fas fa-unlock"></i> Desbloquear Notas
-            </button>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -186,8 +205,7 @@ function showCryptoPasswordModal() {
     const submitBtn = document.getElementById('cryptoSubmit');
     const errorMsg = document.getElementById('cryptoError');
     const toggleBtn = document.getElementById('togglePassword');
-
-    passwordInput.focus();
+    const biometricBtn = document.getElementById('biometricBtn');
 
     // Toggle password visibility
     toggleBtn.onclick = () => {
@@ -196,10 +214,46 @@ function showCryptoPasswordModal() {
         toggleBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
     };
 
-    async function handleSubmit() {
+    // Biometric authentication
+    if (biometricBtn) {
+        biometricBtn.onclick = async () => {
+            biometricBtn.disabled = true;
+            biometricBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+
+            const success = await authenticateWithBiometric(currentUserId);
+
+            if (success) {
+                // Obtener clave desde sessionStorage (guardada anteriormente)
+                const storedKey = sessionStorage.getItem('guardia_derived_key_' + currentUserId);
+                if (storedKey) {
+                    userCryptoKey = await importStoredKey(storedKey);
+                    overlay.remove();
+                    startApp();
+                    return;
+                }
+                // Si no hay clave guardada, pedir contraseña una vez
+                errorMsg.textContent = 'Primera vez: introduce contraseña para activar huella';
+                errorMsg.style.display = 'block';
+                biometricBtn.style.display = 'none';
+            } else {
+                errorMsg.textContent = 'Biometría fallida. Usa contraseña.';
+                errorMsg.style.display = 'block';
+                biometricBtn.disabled = false;
+                biometricBtn.innerHTML = '<i class="fas fa-fingerprint" style="font-size: 1.5rem; margin-right: 0.5rem;"></i> Desbloquear con Huella';
+            }
+        };
+
+        // Auto-trigger biometric on load if available
+        setTimeout(() => biometricBtn.click(), 300);
+    } else {
+        passwordInput.focus();
+    }
+
+    // Password authentication
+    async function handlePasswordSubmit() {
         const password = passwordInput.value;
         if (!password) {
-            errorMsg.textContent = 'Introduce tu contrasena';
+            errorMsg.textContent = 'Introduce tu contraseña';
             errorMsg.style.display = 'block';
             return;
         }
@@ -210,20 +264,86 @@ function showCryptoPasswordModal() {
         const success = await initializeCrypto(password);
 
         if (success) {
-            overlay.remove();
+            // Guardar clave para biometría futura
+            const exportedKey = await exportKeyForStorage(userCryptoKey);
+            sessionStorage.setItem('guardia_derived_key_' + currentUserId, exportedKey);
+
+            // Ofrecer registrar biometría si disponible y no registrada
+            if (isWebAuthnAvailable() && !hasStoredCredential(currentUserId)) {
+                overlay.remove();
+                await offerBiometricRegistration();
+            } else {
+                overlay.remove();
+            }
             startApp();
         } else {
-            errorMsg.textContent = 'Error al procesar. Verifica tu contrasena.';
+            errorMsg.textContent = 'Error al procesar. Verifica tu contraseña.';
             errorMsg.style.display = 'block';
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-unlock"></i> Desbloquear Notas';
+            submitBtn.innerHTML = '<i class="fas fa-unlock"></i> Desbloquear con Contraseña';
         }
     }
 
-    submitBtn.onclick = handleSubmit;
+    submitBtn.onclick = handlePasswordSubmit;
     passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Enter') handlePasswordSubmit();
     });
+}
+
+// Ofrecer registro de biometría
+async function offerBiometricRegistration() {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-modal-overlay active';
+        overlay.innerHTML = `
+            <div class="custom-modal-content" style="max-width: 400px; background: #1a1a2e; border: 1px solid #2d2d44; text-align: center;">
+                <i class="fas fa-fingerprint" style="font-size: 4rem; color: #22c55e; margin-bottom: 1rem;"></i>
+                <h3 style="color: #fff; margin-bottom: 0.5rem;">¿Activar Huella Digital?</h3>
+                <p style="color: #a0a0b0; margin-bottom: 1.5rem; font-size: 0.9rem;">
+                    La próxima vez podrás desbloquear tus notas con un solo toque.
+                </p>
+                <button id="enableBiometric" class="btn btn-primary" style="width: 100%; padding: 1rem; margin-bottom: 0.75rem; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
+                    <i class="fas fa-check"></i> Sí, activar huella
+                </button>
+                <button id="skipBiometric" style="width: 100%; padding: 0.75rem; background: transparent; border: 1px solid #3d3d5c; color: #808090; border-radius: 8px; cursor: pointer;">
+                    Ahora no
+                </button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('enableBiometric').onclick = async () => {
+            const registered = await registerBiometric(currentUserId, auth.currentUser?.email || 'usuario');
+            overlay.remove();
+            if (registered) {
+                showToast('Huella activada correctamente');
+            }
+            resolve();
+        };
+
+        document.getElementById('skipBiometric').onclick = () => {
+            overlay.remove();
+            resolve();
+        };
+    });
+}
+
+// Exportar clave para almacenar en sessionStorage
+async function exportKeyForStorage(key) {
+    const exported = await crypto.subtle.exportKey('raw', key);
+    return btoa(String.fromCharCode(...new Uint8Array(exported)));
+}
+
+// Importar clave desde sessionStorage
+async function importStoredKey(storedKey) {
+    const keyBytes = Uint8Array.from(atob(storedKey), c => c.charCodeAt(0));
+    return await crypto.subtle.importKey(
+        'raw',
+        keyBytes,
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+    );
 }
 
 // ===== INICIALIZAR ELEMENTOS DEL DOM =====

@@ -4,7 +4,7 @@
 // ============================================
 
 // 🆙 VERSIÓN - Incrementa este número cada vez que hagas cambios
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `guardia-cache-${CACHE_VERSION}`;
 const DYNAMIC_CACHE_NAME = `guardia-dynamic-${CACHE_VERSION}`;
 
@@ -29,6 +29,10 @@ const urlsToCache = [
   '/herramientas-guardia/bloc-de-notas/index.html',
   '/herramientas-guardia/bloc-de-notas/styles.css',
   '/herramientas-guardia/bloc-de-notas/script.js',
+
+  // --- Crypto E2E ---
+  '/herramientas-guardia/shared/crypto-utils.js',
+  '/herramientas-guardia/shared/webauthn-utils.js',
 
   '/herramientas-guardia/calculadora-de-drogas/index.html',
 
@@ -155,14 +159,14 @@ async function networkFirstStrategy(request) {
   try {
     // Intentar obtener de la red con timeout
     const networkResponse = await fetchWithTimeout(request, 5000);
-    
+
     // Si la respuesta es válida, guardar en caché y devolver
     if (networkResponse && networkResponse.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
       return networkResponse;
     }
-    
+
     // Si la red falla, intentar caché
     throw new Error('Network response not ok');
   } catch (error) {
@@ -247,7 +251,7 @@ function checkPendingNotifications() {
   // Obtener notificaciones programadas desde IndexedDB
   getScheduledNotifications().then((notifications) => {
     const now = Date.now();
-    
+
     notifications.forEach((notif) => {
       // Si llegó el momento de la notificación
       if (notif.triggerTime <= now && !notif.sent) {
@@ -264,7 +268,7 @@ function checkPendingNotifications() {
             url: notif.url || '/herramientas-guardia/calendario-del-GUARD-IA/'
           }
         });
-        
+
         // Marcar como enviada
         markNotificationAsSent(notif.id);
       }
@@ -275,7 +279,7 @@ function checkPendingNotifications() {
 // Manejar click en la notificación
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       // Si hay una ventana abierta, enfocarla
@@ -299,28 +303,28 @@ self.addEventListener('notificationclick', (event) => {
 function getScheduledNotifications() {
   return new Promise((resolve) => {
     const request = indexedDB.open('GuardiaNotifications', 1);
-    
+
     request.onerror = () => resolve([]);
-    
+
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains('notifications')) {
         db.createObjectStore('notifications', { keyPath: 'id' });
       }
     };
-    
+
     request.onsuccess = (event) => {
       const db = event.target.result;
-      
+
       if (!db.objectStoreNames.contains('notifications')) {
         resolve([]);
         return;
       }
-      
+
       const transaction = db.transaction(['notifications'], 'readonly');
       const store = transaction.objectStore('notifications');
       const getAll = store.getAll();
-      
+
       getAll.onsuccess = () => resolve(getAll.result || []);
       getAll.onerror = () => resolve([]);
     };
@@ -329,16 +333,16 @@ function getScheduledNotifications() {
 
 function markNotificationAsSent(id) {
   const request = indexedDB.open('GuardiaNotifications', 1);
-  
+
   request.onsuccess = (event) => {
     const db = event.target.result;
-    
+
     if (!db.objectStoreNames.contains('notifications')) return;
-    
+
     const transaction = db.transaction(['notifications'], 'readwrite');
     const store = transaction.objectStore('notifications');
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const notif = getRequest.result;
       if (notif) {
