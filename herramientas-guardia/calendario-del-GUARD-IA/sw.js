@@ -4,7 +4,7 @@
 // ========================================
 
 // ⚡ CAMBIA ESTE NÚMERO PARA FORZAR UNA ACTUALIZACIÓN EN TODOS LOS USUARIOS
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.0.0';
 const CACHE_NAME = `calendario-guardia-v${APP_VERSION}`;
 
 const CACHE_ASSETS = [
