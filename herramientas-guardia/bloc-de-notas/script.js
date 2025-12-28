@@ -23,10 +23,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // ===== CRYPTO E2E =====
-import { generateSalt, deriveKey, encrypt, decrypt, isEncrypted } from '../shared/crypto-utils.js';
+import { generateSalt, deriveKey, encrypt, decrypt, isEncrypted } from '../shared/crypto-utils.js?v=8';
 
 // ===== WEBAUTHN (Biometría) =====
-import { isWebAuthnAvailable, hasStoredCredential, registerBiometric, authenticateWithBiometric } from '../shared/webauthn-utils.js';
+import { isWebAuthnAvailable, hasStoredCredential, registerBiometric, authenticateWithBiometric } from '../shared/webauthn-utils.js?v=8';
 
 // Firebase configuration
 const firebaseConfig = {
